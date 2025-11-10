@@ -244,4 +244,152 @@ class AppleMapController {
     return channel.invokeMethod<Uint8List>(
         'map#takeSnapshot', snapshotOptions._toMap());
   }
+
+  // MARK: - Route Calculation Methods
+
+  /// Calculate a route between two points.
+  ///
+  /// Returns a [RouteResult] containing the route coordinates, distance, and expected travel time.
+  ///
+  /// * [origin]: The starting point of the route
+  /// * [destination]: The ending point of the route
+  /// * [transportType]: The type of transport (automobile, walking, transit, any)
+  ///
+  /// Example:
+  /// ```dart
+  /// final route = await controller.calculateRoute(
+  ///   origin: LatLng(37.7749, -122.4194),
+  ///   destination: LatLng(34.0522, -118.2437),
+  ///   transportType: RouteTransportType.automobile,
+  /// );
+  ///
+  /// print('Distance: ${route.formatDistance()}');
+  /// print('Duration: ${route.formatDuration()}');
+  ///
+  /// // Draw the route on the map
+  /// final polyline = Polyline(
+  ///   polylineId: PolylineId('route'),
+  ///   points: route.coordinates,
+  ///   color: Colors.blue,
+  ///   width: 5,
+  /// );
+  /// ```
+  ///
+  /// Throws an exception if:
+  /// * The coordinates are invalid
+  /// * No route can be found
+  /// * Network connection fails
+  /// * The service is unavailable
+  Future<RouteResult> calculateRoute({
+    required LatLng origin,
+    required LatLng destination,
+    RouteTransportType transportType = RouteTransportType.automobile,
+  }) async {
+    final dynamic result = await channel.invokeMethod(
+      'route#calculate',
+      <String, dynamic>{
+        'originLat': origin.latitude,
+        'originLng': origin.longitude,
+        'destLat': destination.latitude,
+        'destLng': destination.longitude,
+        'transportType': transportType.toValue(),
+      },
+    );
+
+    if (result == null) {
+      throw Exception('Failed to calculate route');
+    }
+
+    return RouteResult.fromMap(result as Map);
+  }
+
+  /// Calculate multiple alternate routes between two points.
+  ///
+  /// Returns a list of [RouteResult] objects representing different route options.
+  ///
+  /// * [origin]: The starting point of the route
+  /// * [destination]: The ending point of the route
+  /// * [transportType]: The type of transport (automobile, walking, transit, any)
+  ///
+  /// Example:
+  /// ```dart
+  /// final routes = await controller.calculateAlternateRoutes(
+  ///   origin: LatLng(37.7749, -122.4194),
+  ///   destination: LatLng(34.0522, -118.2437),
+  /// );
+  ///
+  /// for (var i = 0; i < routes.length; i++) {
+  ///   print('Route ${i + 1}: ${routes[i].formatDistance()}, ${routes[i].formatDuration()}');
+  /// }
+  /// ```
+  Future<List<RouteResult>> calculateAlternateRoutes({
+    required LatLng origin,
+    required LatLng destination,
+    RouteTransportType transportType = RouteTransportType.automobile,
+  }) async {
+    final dynamic results = await channel.invokeMethod(
+      'route#calculateAlternate',
+      <String, dynamic>{
+        'originLat': origin.latitude,
+        'originLng': origin.longitude,
+        'destLat': destination.latitude,
+        'destLng': destination.longitude,
+        'transportType': transportType.toValue(),
+      },
+    );
+
+    if (results == null) {
+      throw Exception('Failed to calculate alternate routes');
+    }
+
+    return (results as List)
+        .map((result) => RouteResult.fromMap(result as Map))
+        .toList();
+  }
+
+  /// Calculate the estimated time of arrival (ETA) between two points.
+  ///
+  /// Returns a map containing:
+  /// * `distance`: Distance in meters
+  /// * `expectedTravelTime`: Time in seconds
+  /// * `transportType`: Transport type used
+  ///
+  /// This is faster than [calculateRoute] as it doesn't include the full route coordinates.
+  ///
+  /// * [origin]: The starting point
+  /// * [destination]: The ending point
+  /// * [transportType]: The type of transport
+  ///
+  /// Example:
+  /// ```dart
+  /// final eta = await controller.calculateETA(
+  ///   origin: LatLng(37.7749, -122.4194),
+  ///   destination: LatLng(34.0522, -118.2437),
+  /// );
+  ///
+  /// print('Distance: ${eta['distance'] / 1000} km');
+  /// print('Time: ${eta['expectedTravelTime'] / 60} minutes');
+  /// ```
+  Future<Map<String, dynamic>> calculateETA({
+    required LatLng origin,
+    required LatLng destination,
+    RouteTransportType transportType = RouteTransportType.automobile,
+  }) async {
+    final dynamic result = await channel.invokeMethod(
+      'route#calculateETA',
+      <String, dynamic>{
+        'originLat': origin.latitude,
+        'originLng': origin.longitude,
+        'destLat': destination.latitude,
+        'destLng': destination.longitude,
+        'transportType': transportType.toValue(),
+      },
+    );
+
+    if (result == null) {
+      throw Exception('Failed to calculate ETA');
+    }
+
+    return Map<String, dynamic>.from(result as Map);
+  }
 }

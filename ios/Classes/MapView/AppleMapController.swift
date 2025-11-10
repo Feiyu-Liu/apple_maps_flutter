@@ -9,386 +9,643 @@ import Foundation
 import MapKit
 
 public class AppleMapController: NSObject, FlutterPlatformView {
-    var contentView: UIView
-    var mapView: FlutterMapView
-    var registrar: FlutterPluginRegistrar
-    var channel: FlutterMethodChannel
-    var initialCameraPosition: [String: Any]
-    var options: [String: Any]
-    var currentlySelectedAnnotation: String?
-    var snapShotOptions: MKMapSnapshotter.Options = MKMapSnapshotter.Options()
-    var snapShot: MKMapSnapshotter?
-    
-    public init(withFrame frame: CGRect, withRegistrar registrar: FlutterPluginRegistrar, withargs args: Dictionary<String, Any> ,withId id: Int64) {
-        self.options = args["options"] as! [String: Any]
-        self.channel = FlutterMethodChannel(name: "apple_maps_plugin.luisthein.de/apple_maps_\(id)", binaryMessenger: registrar.messenger())
-        
-        self.mapView = FlutterMapView(channel: channel, options: options)
-        self.registrar = registrar
-        
-        // To stop the odd movement of the Apple logo.
-        self.contentView = UIScrollView()
-        self.contentView.addSubview(mapView)
-        mapView.autoresizingMask = [.flexibleHeight, .flexibleWidth]
-        
-        self.initialCameraPosition = args["initialCameraPosition"]! as! Dictionary<String, Any>
-        
-        super.init()
-        
-        self.mapView.delegate = self
-        
-        self.mapView.setCenterCoordinate(initialCameraPosition, animated: false)
-        self.setMethodCallHandlers()
-        
-        if let annotationsToAdd: NSArray = args["annotationsToAdd"] as? NSArray {
-            self.annotationsToAdd(annotations: annotationsToAdd)
-        }
-        if let polylinesToAdd: NSArray = args["polylinesToAdd"] as? NSArray {
-            self.addPolylines(polylineData: polylinesToAdd)
-        }
-        if let polygonsToAdd: NSArray = args["polygonsToAdd"] as? NSArray {
-            self.addPolygons(polygonData: polygonsToAdd)
-        }
-        if let circlesToAdd: NSArray = args["circlesToAdd"] as? NSArray {
-            self.addCircles(circleData: circlesToAdd)
-        }
+  var contentView: UIView
+  var mapView: FlutterMapView
+  var registrar: FlutterPluginRegistrar
+  var channel: FlutterMethodChannel
+  var initialCameraPosition: [String: Any]
+  var options: [String: Any]
+  var currentlySelectedAnnotation: String?
+  var snapShotOptions: MKMapSnapshotter.Options = MKMapSnapshotter.Options()
+  var snapShot: MKMapSnapshotter?
+
+  public init(
+    withFrame frame: CGRect, withRegistrar registrar: FlutterPluginRegistrar,
+    withargs args: [String: Any], withId id: Int64
+  ) {
+    self.options = args["options"] as! [String: Any]
+    self.channel = FlutterMethodChannel(
+      name: "apple_maps_plugin.luisthein.de/apple_maps_\(id)",
+      binaryMessenger: registrar.messenger())
+
+    self.mapView = FlutterMapView(channel: channel, options: options)
+    self.registrar = registrar
+
+    // To stop the odd movement of the Apple logo.
+    self.contentView = UIScrollView()
+    self.contentView.addSubview(mapView)
+    mapView.autoresizingMask = [.flexibleHeight, .flexibleWidth]
+
+    self.initialCameraPosition = args["initialCameraPosition"]! as! [String: Any]
+
+    super.init()
+
+    self.mapView.delegate = self
+
+    self.mapView.setCenterCoordinate(initialCameraPosition, animated: false)
+    self.setMethodCallHandlers()
+
+    if let annotationsToAdd: NSArray = args["annotationsToAdd"] as? NSArray {
+      self.annotationsToAdd(annotations: annotationsToAdd)
     }
-    
-    public func view() -> UIView {
-        return contentView
+    if let polylinesToAdd: NSArray = args["polylinesToAdd"] as? NSArray {
+      self.addPolylines(polylineData: polylinesToAdd)
     }
-    
-    private func setMethodCallHandlers() {
-        channel.setMethodCallHandler({ [unowned self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
-            if let args: Dictionary<String, Any> = call.arguments as? Dictionary<String,Any> {
-                switch(call.method) {
-                case "annotations#update":
-                    self.annotationUpdate(args: args)
-                    result(nil)
-                    break
-                case "annotations#showInfoWindow":
-                    self.selectAnnotation(with: args["annotationId"] as! String)
-                    break
-                case "annotations#hideInfoWindow":
-                    self.hideAnnotation(with: args["annotationId"] as! String)
-                    break
-                case "annotations#isInfoWindowShown":
-                    result(self.isAnnotationSelected(with: args["annotationId"] as! String))
-                    break
-                case "polylines#update":
-                    self.polylineUpdate(args: args)
-                    result(nil)
-                    break
-                case "polygons#update":
-                    self.polygonUpdate(args: args)
-                    result(nil)
-                    break
-                case "circles#update":
-                    self.circleUpdate(args: args)
-                    result(nil)
-                    break
-                case "map#update":
-                    self.mapView.interpretOptions(options: args["options"] as! Dictionary<String, Any>)
-                    break
-                case "camera#animate":
-                    self.animateCamera(args: args)
-                    result(nil)
-                    break
-                case "camera#move":
-                    self.moveCamera(args: args)
-                    result(nil)
-                    break
-                case "camera#convert":
-                    self.cameraConvert(args: args, result: result)
-                    break
-                case "map#takeSnapshot":
-                    self.takeSnapshot(options: SnapshotOptions.init(options: args), onCompletion: { (snapshot: FlutterStandardTypedData?, error: Error?) -> Void in
-                        result(snapshot ?? error)
-                    })
-                default:
-                    result(FlutterMethodNotImplemented)
-                    break
-                }
-            } else {
-                switch call.method {
-                case "map#getVisibleRegion":
-                    result(self.mapView.getVisibleRegion())
-                    break
-                case "map#isCompassEnabled":
-                    if #available(iOS 9.0, *) {
-                        result(self.mapView.showsCompass)
-                    } else {
-                        result(false)
-                    }
-                    break
-                case "map#isPitchGesturesEnabled":
-                    result(self.mapView.isPitchEnabled)
-                    break
-                case "map#isScrollGesturesEnabled":
-                    result(self.mapView.isScrollEnabled)
-                    break
-                case "map#isZoomGesturesEnabled":
-                    result(self.mapView.isZoomEnabled)
-                    break
-                case "map#isRotateGesturesEnabled":
-                    result(self.mapView.isRotateEnabled)
-                    break
-                case "map#isMyLocationButtonEnabled":
-                    result(self.mapView.isMyLocationButtonShowing ?? false)
-                    break
-                case "map#getMinMaxZoomLevels":
-                    result([self.mapView.minZoomLevel, self.mapView.maxZoomLevel])
-                    break
-                case "camera#getZoomLevel":
-                    result(self.mapView.calculatedZoomLevel)
-                    break
-                default:
-                    result(FlutterMethodNotImplemented)
-                    break
-                }
-            }
-        })
+    if let polygonsToAdd: NSArray = args["polygonsToAdd"] as? NSArray {
+      self.addPolygons(polygonData: polygonsToAdd)
     }
-    
-    private func annotationUpdate(args: Dictionary<String, Any>) -> Void {
-        if let annotationsToAdd = args["annotationsToAdd"] as? NSArray {
-            if annotationsToAdd.count > 0 {
-                self.annotationsToAdd(annotations: annotationsToAdd)
-            }
-        }
-        if let annotationsToChange = args["annotationsToChange"] as? NSArray {
-            if annotationsToChange.count > 0 {
-                self.annotationsToChange(annotations: annotationsToChange)
-            }
-        }
-        if let annotationsToDelete = args["annotationIdsToRemove"] as? NSArray {
-            if annotationsToDelete.count > 0 {
-                self.annotationsIdsToRemove(annotationIds: annotationsToDelete)
-            }
-        }
+    if let circlesToAdd: NSArray = args["circlesToAdd"] as? NSArray {
+      self.addCircles(circleData: circlesToAdd)
     }
-    
-    private func polygonUpdate(args: Dictionary<String, Any>) -> Void {
-        if let polyligonsToAdd: NSArray = args["polygonsToAdd"] as? NSArray {
-            self.addPolygons(polygonData: polyligonsToAdd)
+  }
+
+  public func view() -> UIView {
+    return contentView
+  }
+
+  private func setMethodCallHandlers() {
+    channel.setMethodCallHandler({
+      [unowned self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+      if let args: [String: Any] = call.arguments as? [String: Any] {
+        switch call.method {
+        case "annotations#update":
+          self.annotationUpdate(args: args)
+          result(nil)
+          break
+        case "annotations#showInfoWindow":
+          self.selectAnnotation(with: args["annotationId"] as! String)
+          break
+        case "annotations#hideInfoWindow":
+          self.hideAnnotation(with: args["annotationId"] as! String)
+          break
+        case "annotations#isInfoWindowShown":
+          result(self.isAnnotationSelected(with: args["annotationId"] as! String))
+          break
+        case "polylines#update":
+          self.polylineUpdate(args: args)
+          result(nil)
+          break
+        case "polygons#update":
+          self.polygonUpdate(args: args)
+          result(nil)
+          break
+        case "circles#update":
+          self.circleUpdate(args: args)
+          result(nil)
+          break
+        case "map#update":
+          self.mapView.interpretOptions(options: args["options"] as! [String: Any])
+          break
+        case "camera#animate":
+          self.animateCamera(args: args)
+          result(nil)
+          break
+        case "camera#move":
+          self.moveCamera(args: args)
+          result(nil)
+          break
+        case "camera#convert":
+          self.cameraConvert(args: args, result: result)
+          break
+        case "map#takeSnapshot":
+          self.takeSnapshot(
+            options: SnapshotOptions.init(options: args),
+            onCompletion: { (snapshot: FlutterStandardTypedData?, error: Error?) -> Void in
+              result(snapshot ?? error)
+            })
+        case "route#calculate":
+          self.calculateRoute(args: args, result: result)
+          break
+        case "route#calculateAlternate":
+          self.calculateAlternateRoutes(args: args, result: result)
+          break
+        case "route#calculateETA":
+          self.calculateETA(args: args, result: result)
+          break
+        default:
+          result(FlutterMethodNotImplemented)
+          break
         }
-        if let polygonsToChange: NSArray = args["polygonsToChange"] as? NSArray {
-            self.changePolygons(polygonData: polygonsToChange)
+      } else {
+        switch call.method {
+        case "map#getVisibleRegion":
+          result(self.mapView.getVisibleRegion())
+          break
+        case "map#isCompassEnabled":
+          if #available(iOS 9.0, *) {
+            result(self.mapView.showsCompass)
+          } else {
+            result(false)
+          }
+          break
+        case "map#isPitchGesturesEnabled":
+          result(self.mapView.isPitchEnabled)
+          break
+        case "map#isScrollGesturesEnabled":
+          result(self.mapView.isScrollEnabled)
+          break
+        case "map#isZoomGesturesEnabled":
+          result(self.mapView.isZoomEnabled)
+          break
+        case "map#isRotateGesturesEnabled":
+          result(self.mapView.isRotateEnabled)
+          break
+        case "map#isMyLocationButtonEnabled":
+          result(self.mapView.isMyLocationButtonShowing ?? false)
+          break
+        case "map#getMinMaxZoomLevels":
+          result([self.mapView.minZoomLevel, self.mapView.maxZoomLevel])
+          break
+        case "camera#getZoomLevel":
+          result(self.mapView.calculatedZoomLevel)
+          break
+        default:
+          result(FlutterMethodNotImplemented)
+          break
         }
-        if let polygonsToRemove: NSArray = args["polygonIdsToRemove"] as? NSArray {
-            self.removePolygons(polygonIds: polygonsToRemove)
-        }
+      }
+    })
+  }
+
+  private func annotationUpdate(args: [String: Any]) {
+    if let annotationsToAdd = args["annotationsToAdd"] as? NSArray {
+      if annotationsToAdd.count > 0 {
+        self.annotationsToAdd(annotations: annotationsToAdd)
+      }
     }
-    
-    private func polylineUpdate(args: Dictionary<String, Any>) -> Void {
-        if let polylinesToAdd: NSArray = args["polylinesToAdd"] as? NSArray {
-            self.addPolylines(polylineData: polylinesToAdd)
-        }
-        if let polylinesToChange: NSArray = args["polylinesToChange"] as? NSArray {
-            self.changePolylines(polylineData: polylinesToChange)
-        }
-        if let polylinesToRemove: NSArray = args["polylineIdsToRemove"] as? NSArray {
-            self.removePolylines(polylineIds: polylinesToRemove)
-        }
+    if let annotationsToChange = args["annotationsToChange"] as? NSArray {
+      if annotationsToChange.count > 0 {
+        self.annotationsToChange(annotations: annotationsToChange)
+      }
     }
-    
-    private func circleUpdate(args: Dictionary<String, Any>) -> Void {
-        if let circlesToAdd: NSArray = args["circlesToAdd"] as? NSArray {
-            self.addCircles(circleData: circlesToAdd)
-        }
-        if let circlesToChange: NSArray = args["circlesToChange"] as? NSArray {
-            self.changeCircles(circleData: circlesToChange)
-        }
-        if let circlesToRemove: NSArray = args["circleIdsToRemove"] as? NSArray {
-            self.removeCircles(circleIds: circlesToRemove)
-        }
+    if let annotationsToDelete = args["annotationIdsToRemove"] as? NSArray {
+      if annotationsToDelete.count > 0 {
+        self.annotationsIdsToRemove(annotationIds: annotationsToDelete)
+      }
     }
-    
-    private func moveCamera(args: Dictionary<String, Any>) -> Void {
-        let positionData: Dictionary<String, Any> = self.toPositionData(data: args["cameraUpdate"] as! Array<Any>, animated: true)
-        if !positionData.isEmpty {
-            guard let _ = positionData["moveToBounds"] else {
-                self.mapView.setCenterCoordinate(positionData, animated: false)
-                return
-            }
-            self.mapView.setBounds(positionData, animated: false)
-        }
+  }
+
+  private func polygonUpdate(args: [String: Any]) {
+    if let polyligonsToAdd: NSArray = args["polygonsToAdd"] as? NSArray {
+      self.addPolygons(polygonData: polyligonsToAdd)
     }
-    
-    private func animateCamera(args: Dictionary<String, Any>) -> Void {
-        let positionData: Dictionary<String, Any> = self.toPositionData(data: args["cameraUpdate"] as! Array<Any>, animated: true)
-        if !positionData.isEmpty {
-            guard let _ = positionData["moveToBounds"] else {
-                self.mapView.setCenterCoordinate(positionData, animated: true)
-                return
-            }
-            self.mapView.setBounds(positionData, animated: true)
-        }
+    if let polygonsToChange: NSArray = args["polygonsToChange"] as? NSArray {
+      self.changePolygons(polygonData: polygonsToChange)
     }
-    
-    private func cameraConvert(args: Dictionary<String, Any>, result: FlutterResult) -> Void {
-        guard let annotation = args["annotation"] as? Array<Double> else {
-            result(nil)
-            return
-        }
-        let point = self.mapView.convert(CLLocationCoordinate2D(latitude: annotation[0] , longitude: annotation[1]), toPointTo: self.view())
-        result(["point": [point.x, point.y]])
+    if let polygonsToRemove: NSArray = args["polygonIdsToRemove"] as? NSArray {
+      self.removePolygons(polygonIds: polygonsToRemove)
     }
-    
-    private func toPositionData(data: Array<Any>, animated: Bool) -> Dictionary<String, Any> {
-        var positionData: Dictionary<String, Any> = [:]
-        if let update: String = data[0] as? String {
-            switch(update) {
-            case "newCameraPosition":
-                if let _positionData : Dictionary<String, Any> = data[1] as? Dictionary<String, Any> {
-                    positionData = _positionData
-                }
-            case "newLatLng":
-                if let _positionData : Array<Any> = data[1] as? Array<Any> {
-                    positionData = ["target": _positionData]
-                }
-            case "newLatLngZoom":
-                if let _positionData: Array<Any> = data[1] as? Array<Any> {
-                    let zoom: Double = data[2] as? Double ?? 0
-                    positionData = ["target": _positionData, "zoom": zoom]
-                }
-            case "newLatLngBounds":
-                if let _positionData: Array<Any> = data[1] as? Array<Any> {
-                    let padding: Double = data[2] as? Double ?? 0
-                    positionData = ["target": _positionData, "padding": padding, "moveToBounds": true]
-                }
-            case "zoomBy":
-                if let zoomBy: Double = data[1] as? Double {
-                    mapView.zoomBy(zoomBy: zoomBy, animated: animated)
-                }
-            case "zoomTo":
-                if let zoomTo: Double = data[1] as? Double {
-                    mapView.zoomTo(newZoomLevel: zoomTo, animated: animated)
-                }
-            case "zoomIn":
-                mapView.zoomIn(animated: animated)
-            case "zoomOut":
-                mapView.zoomOut(animated: animated)
-            default:
-                positionData = [:]
-            }
-            return positionData
-        }
-        return [:]
+  }
+
+  private func polylineUpdate(args: [String: Any]) {
+    if let polylinesToAdd: NSArray = args["polylinesToAdd"] as? NSArray {
+      self.addPolylines(polylineData: polylinesToAdd)
     }
+    if let polylinesToChange: NSArray = args["polylinesToChange"] as? NSArray {
+      self.changePolylines(polylineData: polylinesToChange)
+    }
+    if let polylinesToRemove: NSArray = args["polylineIdsToRemove"] as? NSArray {
+      self.removePolylines(polylineIds: polylinesToRemove)
+    }
+  }
+
+  private func circleUpdate(args: [String: Any]) {
+    if let circlesToAdd: NSArray = args["circlesToAdd"] as? NSArray {
+      self.addCircles(circleData: circlesToAdd)
+    }
+    if let circlesToChange: NSArray = args["circlesToChange"] as? NSArray {
+      self.changeCircles(circleData: circlesToChange)
+    }
+    if let circlesToRemove: NSArray = args["circleIdsToRemove"] as? NSArray {
+      self.removeCircles(circleIds: circlesToRemove)
+    }
+  }
+
+  private func moveCamera(args: [String: Any]) {
+    let positionData: [String: Any] = self.toPositionData(
+      data: args["cameraUpdate"] as! [Any], animated: true)
+    if !positionData.isEmpty {
+      guard positionData["moveToBounds"] != nil else {
+        self.mapView.setCenterCoordinate(positionData, animated: false)
+        return
+      }
+      self.mapView.setBounds(positionData, animated: false)
+    }
+  }
+
+  private func animateCamera(args: [String: Any]) {
+    let positionData: [String: Any] = self.toPositionData(
+      data: args["cameraUpdate"] as! [Any], animated: true)
+    if !positionData.isEmpty {
+      guard positionData["moveToBounds"] != nil else {
+        self.mapView.setCenterCoordinate(positionData, animated: true)
+        return
+      }
+      self.mapView.setBounds(positionData, animated: true)
+    }
+  }
+
+  private func cameraConvert(args: [String: Any], result: FlutterResult) {
+    guard let annotation = args["annotation"] as? [Double] else {
+      result(nil)
+      return
+    }
+    let point = self.mapView.convert(
+      CLLocationCoordinate2D(latitude: annotation[0], longitude: annotation[1]),
+      toPointTo: self.view())
+    result(["point": [point.x, point.y]])
+  }
+
+  private func toPositionData(data: [Any], animated: Bool) -> [String: Any] {
+    var positionData: [String: Any] = [:]
+    if let update: String = data[0] as? String {
+      switch update {
+      case "newCameraPosition":
+        if let _positionData: [String: Any] = data[1] as? [String: Any] {
+          positionData = _positionData
+        }
+      case "newLatLng":
+        if let _positionData: [Any] = data[1] as? [Any] {
+          positionData = ["target": _positionData]
+        }
+      case "newLatLngZoom":
+        if let _positionData: [Any] = data[1] as? [Any] {
+          let zoom: Double = data[2] as? Double ?? 0
+          positionData = ["target": _positionData, "zoom": zoom]
+        }
+      case "newLatLngBounds":
+        if let _positionData: [Any] = data[1] as? [Any] {
+          let padding: Double = data[2] as? Double ?? 0
+          positionData = ["target": _positionData, "padding": padding, "moveToBounds": true]
+        }
+      case "zoomBy":
+        if let zoomBy: Double = data[1] as? Double {
+          mapView.zoomBy(zoomBy: zoomBy, animated: animated)
+        }
+      case "zoomTo":
+        if let zoomTo: Double = data[1] as? Double {
+          mapView.zoomTo(newZoomLevel: zoomTo, animated: animated)
+        }
+      case "zoomIn":
+        mapView.zoomIn(animated: animated)
+      case "zoomOut":
+        mapView.zoomOut(animated: animated)
+      default:
+        positionData = [:]
+      }
+      return positionData
+    }
+    return [:]
+  }
 }
 
-
 extension AppleMapController: MKMapViewDelegate {
-    // onIdle
-    public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-        if ((self.mapView.mapContainerView) != nil) {
-            let locationOnMap = self.mapView.region.center
-            self.channel.invokeMethod("camera#onMove", arguments: ["position": ["heading": self.mapView.actualHeading, "target":  [locationOnMap.latitude, locationOnMap.longitude], "pitch": self.mapView.camera.pitch, "zoom": self.mapView.calculatedZoomLevel]])
-        }
-        self.channel.invokeMethod("camera#onIdle", arguments: "")
+  // onIdle
+  public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+    if (self.mapView.mapContainerView) != nil {
+      let locationOnMap = self.mapView.region.center
+      self.channel.invokeMethod(
+        "camera#onMove",
+        arguments: [
+          "position": [
+            "heading": self.mapView.actualHeading,
+            "target": [locationOnMap.latitude, locationOnMap.longitude],
+            "pitch": self.mapView.camera.pitch, "zoom": self.mapView.calculatedZoomLevel,
+          ]
+        ])
     }
-    
-    // onMoveStarted
-    public func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
-        self.channel.invokeMethod("camera#onMoveStarted", arguments: "")
+    self.channel.invokeMethod("camera#onIdle", arguments: "")
+  }
+
+  // onMoveStarted
+  public func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
+    self.channel.invokeMethod("camera#onMoveStarted", arguments: "")
+  }
+
+  public func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+    if overlay is FlutterPolyline {
+      return self.polylineRenderer(overlay: overlay)
+    } else if overlay is FlutterPolygon {
+      return self.polygonRenderer(overlay: overlay)
+    } else if overlay is FlutterCircle {
+      return self.circleRenderer(overlay: overlay)
     }
-    
-    public func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-        if overlay is FlutterPolyline {
-            return self.polylineRenderer(overlay: overlay)
-        } else if overlay is FlutterPolygon {
-            return self.polygonRenderer(overlay: overlay)
-        } else if overlay is FlutterCircle {
-            return self.circleRenderer(overlay: overlay)
-        }
-        return MKOverlayRenderer()
-    }
+    return MKOverlayRenderer()
+  }
 }
 
 extension AppleMapController {
-    private func takeSnapshot(options: SnapshotOptions, onCompletion: @escaping (FlutterStandardTypedData?, Error?) -> Void) {
-        // MKMapSnapShotOptions setting.
-        snapShotOptions.region = self.mapView.region
-        snapShotOptions.size = self.mapView.frame.size
-        snapShotOptions.scale = UIScreen.main.scale
-        snapShotOptions.showsBuildings = options.showBuildings
-        snapShotOptions.showsPointsOfInterest = options.showPointsOfInterest
-        
-        // Set MKMapSnapShotOptions to MKMapSnapShotter.
-        snapShot = MKMapSnapshotter(options: snapShotOptions)
-        
-        snapShot?.cancel()
-        
-        if #available(iOS 10.0, *) {
-            snapShot?.start { [weak self] snapshot, error in
-                guard let self = self else {
-                    return
-                }
-                
-                guard let snapshot = snapshot, error == nil else {
-                    onCompletion(nil, error)
-                    return
-                }
-                
-                let image = UIGraphicsImageRenderer(size: self.snapShotOptions.size).image { [weak self] context in
-                    guard let self = self else {
-                        return
-                    }
-                    snapshot.image.draw(at: .zero)
-                    let rect = self.snapShotOptions.mapRect
-                    if options.showAnnotations {
-                        for annotation in self.mapView.getMapViewAnnotations() {
-                            self.drawAnnotations(annotation: annotation, point: snapshot.point(for: annotation!.coordinate))
-                        }
-                    }
-                    if options.showOverlays {
-                        for overlay in self.mapView.overlays {
-                            if ((overlay.intersects?(rect)) != nil) {
-                                self.drawOverlays(overlay: overlay, snapshot: snapshot, context: context)
-                            }
-                        }
-                    }
-                }
+  private func takeSnapshot(
+    options: SnapshotOptions, onCompletion: @escaping (FlutterStandardTypedData?, Error?) -> Void
+  ) {
+    // MKMapSnapShotOptions setting.
+    snapShotOptions.region = self.mapView.region
+    snapShotOptions.size = self.mapView.frame.size
+    snapShotOptions.scale = UIScreen.main.scale
+    snapShotOptions.showsBuildings = options.showBuildings
+    snapShotOptions.showsPointsOfInterest = options.showPointsOfInterest
 
-                if let imageData = image.pngData() {
-                    onCompletion(FlutterStandardTypedData.init(bytes: imageData), nil)
-                }
+    // Set MKMapSnapShotOptions to MKMapSnapShotter.
+    snapShot = MKMapSnapshotter(options: snapShotOptions)
+
+    snapShot?.cancel()
+
+    if #available(iOS 10.0, *) {
+      snapShot?.start { [weak self] snapshot, error in
+        guard let self = self else {
+          return
+        }
+
+        guard let snapshot = snapshot, error == nil else {
+          onCompletion(nil, error)
+          return
+        }
+
+        let image = UIGraphicsImageRenderer(size: self.snapShotOptions.size).image {
+          [weak self] context in
+          guard let self = self else {
+            return
+          }
+          snapshot.image.draw(at: .zero)
+          let rect = self.snapShotOptions.mapRect
+          if options.showAnnotations {
+            for annotation in self.mapView.getMapViewAnnotations() {
+              self.drawAnnotations(
+                annotation: annotation, point: snapshot.point(for: annotation!.coordinate))
             }
+          }
+          if options.showOverlays {
+            for overlay in self.mapView.overlays {
+              if (overlay.intersects?(rect)) != nil {
+                self.drawOverlays(overlay: overlay, snapshot: snapshot, context: context)
+              }
+            }
+          }
         }
+
+        if let imageData = image.pngData() {
+          onCompletion(FlutterStandardTypedData.init(bytes: imageData), nil)
+        }
+      }
     }
-    
-    private func drawAnnotations(annotation: FlutterAnnotation?, point: CGPoint) {
-        guard annotation != nil else {
-            return
-        }
-        let annotationView = self.getAnnotationView(annotation: annotation!)
-        
-        var offsetPoint = point
-        
-        offsetPoint.x -= annotationView.bounds.width / 2
-        offsetPoint.y -= annotationView.bounds.height / 2
-        
-        
-        if #available(iOS 11.0, *), annotationView is MKMarkerAnnotationView {
-            annotationView.drawHierarchy(in: CGRect(x: offsetPoint.x, y: offsetPoint.y, width: annotationView.bounds.width, height: annotationView.bounds.height), afterScreenUpdates: true)
+  }
+
+  private func drawAnnotations(annotation: FlutterAnnotation?, point: CGPoint) {
+    guard annotation != nil else {
+      return
+    }
+    let annotationView = self.getAnnotationView(annotation: annotation!)
+
+    var offsetPoint = point
+
+    offsetPoint.x -= annotationView.bounds.width / 2
+    offsetPoint.y -= annotationView.bounds.height / 2
+
+    if #available(iOS 11.0, *), annotationView is MKMarkerAnnotationView {
+      annotationView.drawHierarchy(
+        in: CGRect(
+          x: offsetPoint.x, y: offsetPoint.y, width: annotationView.bounds.width,
+          height: annotationView.bounds.height), afterScreenUpdates: true)
+    } else {
+      offsetPoint.x += annotationView.centerOffset.x
+      offsetPoint.y += annotationView.centerOffset.y
+      let annotationImage = annotationView.image
+      annotationImage?.draw(at: offsetPoint)
+    }
+  }
+
+  @available(iOS 10.0, *)
+  private func drawOverlays(
+    overlay: MKOverlay?, snapshot: MKMapSnapshotter.Snapshot, context: UIGraphicsRendererContext
+  ) {
+    guard overlay != nil else {
+      return
+    }
+
+    if let flutterOverlay: FlutterOverlay = overlay as? FlutterOverlay {
+      flutterOverlay.getCAShapeLayer(snapshot: snapshot).render(in: context.cgContext)
+    }
+
+  }
+
+  // MARK: - Route Calculation Methods
+
+  /// 计算单条路线
+  private func calculateRoute(args: [String: Any], result: @escaping FlutterResult) {
+    // 提取参数
+    guard let originLat = args["originLat"] as? Double,
+      let originLng = args["originLng"] as? Double,
+      let destLat = args["destLat"] as? Double,
+      let destLng = args["destLng"] as? Double
+    else {
+      result(
+        FlutterError(
+          code: "INVALID_ARGUMENTS",
+          message: "Missing or invalid coordinates",
+          details: "originLat, originLng, destLat, destLng are required"
+        ))
+      return
+    }
+
+    let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLng)
+    let destination = CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+
+    // 解析交通方式
+    let transportTypeString = args["transportType"] as? String ?? "automobile"
+    let transportType = self.parseTransportType(transportTypeString)
+
+    // 创建路线计算器
+    let calculator = RouteCalculator()
+
+    // 执行计算
+    calculator.calculateRoute(
+      origin: origin,
+      destination: destination,
+      transportType: transportType
+    ) { routeResult in
+      switch routeResult {
+      case .success(let route):
+        result(route.toDictionary())
+      case .failure(let error):
+        // 构建详细的错误信息
+        print("🔍 Error type: \(type(of: error))")
+        print("🔍 Error: \(error)")
+
+        var errorCode = "ROUTE_ERROR"
+        var errorDetails: [String: Any] = [:]
+
+        if let routeError = error as? RouteCalculatorError {
+          print("✅ Recognized as RouteCalculatorError")
+          errorCode = routeError.getDetailedInfo()["errorType"] as? String ?? "ROUTE_ERROR"
+          errorDetails = routeError.getDetailedInfo()
         } else {
-            offsetPoint.x += annotationView.centerOffset.x
-            offsetPoint.y += annotationView.centerOffset.y
-            let annotationImage = annotationView.image
-            annotationImage?.draw(at: offsetPoint)
+          print("⚠️ Not recognized as RouteCalculatorError, treating as generic error")
+          let nsError = error as NSError
+          errorDetails = [
+            "errorType": "UNKNOWN",
+            "code": nsError.code,
+            "domain": nsError.domain,
+            "description": nsError.localizedDescription,
+            "underlyingError": nsError.localizedDescription,
+            "userInfo": String(describing: nsError.userInfo),
+          ]
         }
+
+        result(
+          FlutterError(
+            code: errorCode,
+            message: error.localizedDescription,
+            details: errorDetails
+          ))
+      }
     }
-    
-    @available(iOS 10.0, *)
-    private func drawOverlays(overlay: MKOverlay?, snapshot: MKMapSnapshotter.Snapshot, context: UIGraphicsRendererContext) {
-        guard overlay != nil else {
-            return
-        }
-        
-        if let flutterOverlay: FlutterOverlay = overlay as? FlutterOverlay {
-            flutterOverlay.getCAShapeLayer(snapshot: snapshot).render(in: context.cgContext)
-        }
-        
+  }
+
+  /// 计算多条备选路线
+  private func calculateAlternateRoutes(args: [String: Any], result: @escaping FlutterResult) {
+    guard let originLat = args["originLat"] as? Double,
+      let originLng = args["originLng"] as? Double,
+      let destLat = args["destLat"] as? Double,
+      let destLng = args["destLng"] as? Double
+    else {
+      result(
+        FlutterError(
+          code: "INVALID_ARGUMENTS",
+          message: "Missing or invalid coordinates",
+          details: "originLat, originLng, destLat, destLng are required"
+        ))
+      return
     }
+
+    let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLng)
+    let destination = CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+
+    let transportTypeString = args["transportType"] as? String ?? "automobile"
+    let transportType = self.parseTransportType(transportTypeString)
+
+    let calculator = RouteCalculator()
+
+    calculator.calculateAlternateRoutes(
+      origin: origin,
+      destination: destination,
+      transportType: transportType
+    ) { routeResult in
+      switch routeResult {
+      case .success(let routes):
+        let routeDicts = routes.map { $0.toDictionary() }
+        result(routeDicts)
+      case .failure(let error):
+        // 构建详细的错误信息
+        var errorCode = "ROUTE_ERROR"
+        var errorDetails: [String: Any] = [:]
+
+        if let routeError = error as? RouteCalculatorError {
+          errorCode = routeError.getDetailedInfo()["errorType"] as? String ?? "ROUTE_ERROR"
+          errorDetails = routeError.getDetailedInfo()
+        } else {
+          let nsError = error as NSError
+          errorDetails = [
+            "errorType": "UNKNOWN",
+            "code": nsError.code,
+            "domain": nsError.domain,
+            "description": nsError.localizedDescription,
+            "userInfo": String(describing: nsError.userInfo),
+          ]
+        }
+
+        result(
+          FlutterError(
+            code: errorCode,
+            message: error.localizedDescription,
+            details: errorDetails
+          ))
+      }
+    }
+  }
+
+  /// 计算 ETA（预计到达时间）
+  private func calculateETA(args: [String: Any], result: @escaping FlutterResult) {
+    guard let originLat = args["originLat"] as? Double,
+      let originLng = args["originLng"] as? Double,
+      let destLat = args["destLat"] as? Double,
+      let destLng = args["destLng"] as? Double
+    else {
+      result(
+        FlutterError(
+          code: "INVALID_ARGUMENTS",
+          message: "Missing or invalid coordinates",
+          details: "originLat, originLng, destLat, destLng are required"
+        ))
+      return
+    }
+
+    let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLng)
+    let destination = CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+
+    let transportTypeString = args["transportType"] as? String ?? "automobile"
+    let transportType = self.parseTransportType(transportTypeString)
+
+    let calculator = RouteCalculator()
+
+    calculator.calculateETA(
+      origin: origin,
+      destination: destination,
+      transportType: transportType
+    ) { etaResult in
+      switch etaResult {
+      case .success(let eta):
+        result(eta)
+      case .failure(let error):
+        // 构建详细的错误信息
+        var errorCode = "ROUTE_ERROR"
+        var errorDetails: [String: Any] = [:]
+
+        if let routeError = error as? RouteCalculatorError {
+          errorCode = routeError.getDetailedInfo()["errorType"] as? String ?? "ROUTE_ERROR"
+          errorDetails = routeError.getDetailedInfo()
+        } else {
+          let nsError = error as NSError
+          errorDetails = [
+            "errorType": "UNKNOWN",
+            "code": nsError.code,
+            "domain": nsError.domain,
+            "description": nsError.localizedDescription,
+            "userInfo": String(describing: nsError.userInfo),
+          ]
+        }
+
+        result(
+          FlutterError(
+            code: errorCode,
+            message: error.localizedDescription,
+            details: errorDetails
+          ))
+      }
+    }
+  }
+
+  /// 解析交通方式字符串
+  private func parseTransportType(_ typeString: String) -> MKDirectionsTransportType {
+    switch typeString.lowercased() {
+    case "automobile", "driving":
+      return .automobile
+    case "walking":
+      return .walking
+    case "cycling", "bicycle":
+      // iOS 17+ 支持骑行路线
+      // 注意：骑行路线的可用性因地区而异
+      if #available(iOS 17.0, *) {
+        return .cycling
+      } else {
+        // iOS 17 以下版本使用步行路线近似
+        return .walking
+      }
+    case "transit":
+      return .transit
+    case "any":
+      return .any
+    default:
+      return .automobile
+    }
+  }
 }
