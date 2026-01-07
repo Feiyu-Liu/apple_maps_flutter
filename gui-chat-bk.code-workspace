@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "gui-chat-bk"
+		},
+		{
+			"path": "react-agent"
+		},
+		{
+			"path": "data-enrichment"
+		},
+		{
+			"path": "langgraph-mcp"
+		},
+		{
+			"path": "../../../Lang/Learn"
+		}
+	],
+	"settings": {}
+}
