@@ -140,11 +140,9 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
             
             self.layoutMargins = margins
         }
-        
-        if let mapType: Int = options["mapType"] as? Int {
-            self.mapType = self.mapTypes[mapType]
-        }
-        
+
+        // Note: mapType is now handled with iOS version checking at the end of interpretOptions
+
         if let trafficEnabled: Bool = options["trafficEnabled"] as? Bool {
             if #available(iOS 9.0, *) {
                 self.showsTraffic = trafficEnabled
@@ -198,6 +196,25 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         if let insetsSafeArea: Bool = options["insetsLayoutMarginsFromSafeArea"] as? Bool {
             if #available(iOS 11.0, *) {
                 self.insetsLayoutMarginsFromSafeArea = insetsSafeArea
+            }
+        }
+
+        // iOS 16+ Map Configuration (replaces deprecated mapType)
+        if #available(iOS 16.0, *) {
+            if let mapConfig = options["mapConfiguration"] as? [String: Any] {
+                if let config = MapConfigurationHandler.createConfiguration(mapConfig) {
+                    self.preferredConfiguration = config
+                }
+            }
+
+            // Selectable map features
+            if let selectableFeatures = options["selectableFeatures"] as? [String: Any] {
+                self.selectableMapFeatures = POIHandler.parseMapFeatureOptions(selectableFeatures)
+            }
+        } else {
+            // iOS 16- fallback to deprecated mapType
+            if let mapType: Int = options["mapType"] as? Int {
+                self.mapType = self.mapTypes[mapType]
             }
         }
 

@@ -77,6 +77,9 @@ class AppleMapController {
         _appleMapState
             .onLongPress(LatLng._fromJson(call.arguments['position'])!);
         break;
+      case 'poi#onSelected':
+        _appleMapState.onPOISelected(call.arguments);
+        break;
       default:
         throw MissingPluginException();
     }
@@ -391,5 +394,55 @@ class AppleMapController {
     }
 
     return Map<String, dynamic>.from(result as Map);
+  }
+
+  // MARK: - POI and Map Configuration Methods (iOS 16+)
+
+  /// Updates the map configuration (iOS 16+).
+  ///
+  /// This replaces the deprecated [mapType] property with the new
+  /// [MapConfigurationOptions] system.
+  ///
+  /// Example:
+  /// ```dart
+  /// await controller.updateMapConfiguration(
+  ///   MapConfigurationOptions.standard(
+  ///     emphasisStyle: StandardMapEmphasisStyle.muted,
+  ///   ),
+  /// );
+  /// ```
+  Future<void> updateMapConfiguration(
+    MapConfigurationOptions configuration,
+  ) async {
+    await channel.invokeMethod<void>(
+      'map#updateConfiguration',
+      configuration.toMap(),
+    );
+  }
+
+  /// Updates the selectable map features (iOS 16+).
+  ///
+  /// Controls which types of map features (POIs, boundaries, physical features)
+  /// can be selected by the user.
+  ///
+  /// Example:
+  /// ```dart
+  /// await controller.updateSelectableFeatures(
+  ///   MapFeatureOptions(
+  ///     pointsOfInterest: true,
+  ///     territorialBoundaries: false,
+  ///     physicalFeatures: false,
+  ///   ),
+  /// );
+  /// ```
+  Future<void> updateSelectableFeatures(
+    MapFeatureOptions features,
+  ) async {
+    await channel.invokeMethod<void>(
+      'map#updateSelectableFeatures',
+      <String, dynamic>{
+        'features': features.toMap(),
+      },
+    );
   }
 }

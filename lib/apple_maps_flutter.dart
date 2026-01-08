@@ -34,3 +34,4 @@ part 'src/polygon_updates.dart';
 part 'src/ui.dart';
 part 'src/snapshot_options.dart';
 part 'src/route_result.dart';
+part 'src/poi.dart';

@@ -15,6 +15,7 @@ import 'package:apple_maps_flutter_example/place_annotation.dart';
 import 'package:apple_maps_flutter_example/place_circle.dart';
 import 'package:apple_maps_flutter_example/place_polygon.dart';
 import 'package:apple_maps_flutter_example/place_polyline.dart';
+import 'package:apple_maps_flutter_example/poi_features_example.dart';
 import 'package:apple_maps_flutter_example/route_calculation_example.dart';
 import 'package:apple_maps_flutter_example/scrolling_map.dart';
 import 'package:apple_maps_flutter_example/snapshot.dart';
@@ -36,6 +37,7 @@ final List<ExamplePage> _allPages = <ExamplePage>[
   MapUpdatePage(),
   SnapshotPage(),
   RouteCalculationPage(), // 🆕 路线计算示例
+  POIFeaturesPage(), // 🆕 POI功能示例 (iOS 16+)
 ];
 
 class MapsDemo extends StatelessWidget {

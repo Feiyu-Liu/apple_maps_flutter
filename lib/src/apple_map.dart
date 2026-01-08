@@ -43,6 +43,10 @@ class AppleMap extends StatefulWidget {
     this.onLongPress,
     this.snapshotOptions,
     this.insetsLayoutMarginsFromSafeArea = true,
+    // iOS 16+ POI features
+    this.mapConfigurationOptions,
+    this.selectableMapFeatures,
+    this.onPOISelected,
   }) : super(key: key);
 
   final MapCreatedCallback? onMapCreated;
@@ -169,6 +173,15 @@ class AppleMap extends StatefulWidget {
   /// A Boolean value indicating whether the view's layout margins are updated
   /// automatically to reflect the safe area.
   final bool insetsLayoutMarginsFromSafeArea;
+
+  // iOS 16+ Map Configuration (replaces deprecated mapType)
+  final MapConfigurationOptions? mapConfigurationOptions;
+
+  // iOS 16+ Selectable map features
+  final MapFeatureOptions? selectableMapFeatures;
+
+  // iOS 16+ POI selection callback
+  final ArgumentCallback<POIData>? onPOISelected;
 
   @override
   State createState() => _AppleMapState();
@@ -321,6 +334,10 @@ class _AppleMapState extends State<AppleMap> {
   void onLongPress(LatLng position) {
     widget.onLongPress?.call(position);
   }
+
+  void onPOISelected(Map<dynamic, dynamic> poiData) {
+    widget.onPOISelected?.call(POIData.fromMap(poiData));
+  }
 }
 
 /// Configuration options for the AppleMaps user interface.
@@ -342,6 +359,8 @@ class _AppleMapOptions {
     this.myLocationButtonEnabled,
     this.padding,
     this.insetsLayoutMarginsFromSafeArea,
+    this.mapConfigurationOptions,
+    this.selectableMapFeatures,
   });
 
   static _AppleMapOptions fromWidget(AppleMap map) {
@@ -359,6 +378,8 @@ class _AppleMapOptions {
       myLocationButtonEnabled: map.myLocationButtonEnabled,
       padding: map.padding,
       insetsLayoutMarginsFromSafeArea: map.insetsLayoutMarginsFromSafeArea,
+      mapConfigurationOptions: map.mapConfigurationOptions,
+      selectableMapFeatures: map.selectableMapFeatures,
     );
   }
 
@@ -388,6 +409,10 @@ class _AppleMapOptions {
 
   final bool? insetsLayoutMarginsFromSafeArea;
 
+  final MapConfigurationOptions? mapConfigurationOptions;
+
+  final MapFeatureOptions? selectableMapFeatures;
+
   Map<String, dynamic> toMap() {
     final Map<String, dynamic> optionsMap = <String, dynamic>{};
 
@@ -411,6 +436,20 @@ class _AppleMapOptions {
     addIfNonNull('padding', _serializePadding(padding));
     addIfNonNull(
         'insetsLayoutMarginsFromSafeArea', insetsLayoutMarginsFromSafeArea);
+
+    // iOS 16+ Map Configuration - prioritize over deprecated mapType
+    if (mapConfigurationOptions != null) {
+      optionsMap['mapConfiguration'] = mapConfigurationOptions!.toMap();
+    } else if (mapType != null) {
+      // Fallback to deprecated mapType for iOS < 16
+      addIfNonNull('mapType', mapType?.index);
+    }
+
+    // iOS 16+ Selectable map features
+    if (selectableMapFeatures != null) {
+      optionsMap['selectableFeatures'] = selectableMapFeatures!.toMap();
+    }
+
     return optionsMap;
   }
 

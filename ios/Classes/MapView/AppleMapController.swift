@@ -122,6 +122,14 @@ public class AppleMapController: NSObject, FlutterPlatformView {
         case "route#calculateETA":
           self.calculateETA(args: args, result: result)
           break
+        case "map#updateConfiguration":
+          self.updateMapConfiguration(args: args)
+          result(nil)
+          break
+        case "map#updateSelectableFeatures":
+          self.updateSelectableFeatures(args: args)
+          result(nil)
+          break
         default:
           result(FlutterMethodNotImplemented)
           break
@@ -331,6 +339,28 @@ extension AppleMapController: MKMapViewDelegate {
       return self.circleRenderer(overlay: overlay)
     }
     return MKOverlayRenderer()
+  }
+
+  // MARK: - POI Selection (iOS 16+)
+
+  @available(iOS 16.0, *)
+  public func mapView(_ mapView: MKMapView, didSelect annotation: MKAnnotation) {
+    if let featureAnnotation = annotation as? MKMapFeatureAnnotation {
+      handlePOISelection(featureAnnotation)
+    }
+  }
+
+  @available(iOS 16.0, *)
+  public func mapView(_ mapView: MKMapView, didDeselect annotation: MKAnnotation) {
+    // 可以在这里处理取消选择的逻辑
+    // 例如发送取消选择事件到Dart端
+  }
+
+  // 处理POI选择事件
+  @available(iOS 16.0, *)
+  private func handlePOISelection(_ annotation: MKMapFeatureAnnotation) {
+    let poiData = POIHandler.serializePOIAnnotation(annotation)
+    channel.invokeMethod("poi#onSelected", arguments: poiData)
   }
 }
 
@@ -620,6 +650,39 @@ extension AppleMapController {
             message: error.localizedDescription,
             details: errorDetails
           ))
+      }
+    }
+  }
+
+  // MARK: - POI and Map Configuration Methods (iOS 16+)
+
+  /// 更新地图配置
+  private func updateMapConfiguration(args: [String: Any]) {
+    if #available(iOS 16.0, *) {
+      if let config = MapConfigurationHandler.createConfiguration(args) {
+        mapView.preferredConfiguration = config
+      }
+    } else {
+      // iOS 16以下，回退到mapType
+      if let typeString = args["type"] as? String,
+         let configType = MapConfigurationType(rawValue: typeString) {
+        switch configType {
+        case .standard:
+          mapView.mapType = .standard
+        case .hybrid:
+          mapView.mapType = .hybrid
+        case .imagery:
+          mapView.mapType = .satellite
+        }
+      }
+    }
+  }
+
+  /// 更新可选择的地图特性
+  private func updateSelectableFeatures(args: [String: Any]) {
+    if #available(iOS 16.0, *) {
+      if let featuresOptions = args["features"] as? [String: Any] {
+        mapView.selectableMapFeatures = POIHandler.parseMapFeatureOptions(featuresOptions)
       }
     }
   }
