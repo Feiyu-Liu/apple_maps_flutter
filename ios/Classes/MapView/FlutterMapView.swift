@@ -14,7 +14,7 @@ enum BUTTON_IDS: Int {
 }
 
 
-class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
+class FlutterMapView: MKMapView, UIGestureRecognizerDelegate, CLLocationManagerDelegate {
     weak var mapContainerView: UIView?
     weak var channel: FlutterMethodChannel?
     var oldBounds: CGRect?
@@ -222,24 +222,30 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
     
     func setUserLocation() {
         let authorizationStatus = CLLocationManager.authorizationStatus()
-        
+
         switch authorizationStatus {
         case .notDetermined:
+            locationManager.delegate = self
             locationManager.requestWhenInUseAuthorization()
             break
-            
+
         case .authorizedAlways:
             fallthrough
         case .authorizedWhenInUse:
-            locationManager.requestWhenInUseAuthorization()
+            locationManager.delegate = self
             locationManager.desiredAccuracy = kCLLocationAccuracyBest
             locationManager.distanceFilter = kCLDistanceFilterNone
             locationManager.startUpdatingLocation()
             self.showsUserLocation = true
             break
-            
+
         default:
-            print("\(authorizationStatus.rawValue) is not supported.")
+            // Permission denied - notify Dart
+            channel?.invokeMethod("location#onError", arguments: [
+                "code": "permissionDenied",
+                "message": "Location permission not granted",
+                "details": authorizationStatus.rawValue
+            ])
         }
     }
     
@@ -365,5 +371,41 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         let xDist = a.x - b.x
         let yDist = a.y - b.y
         return CGFloat(sqrt(xDist * xDist + yDist * yDist))
+    }
+
+    // MARK: - CLLocationManagerDelegate
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+
+        let locationData: [String: Any] = [
+            "latitude": location.coordinate.latitude,
+            "longitude": location.coordinate.longitude,
+            "accuracy": location.horizontalAccuracy >= 0 ? location.horizontalAccuracy : nil,
+            "altitude": location.altitude,
+            "speed": location.speed >= 0 ? location.speed : nil,
+            "speedAccuracy": location.speedAccuracy >= 0 ? location.speedAccuracy : nil,
+            "heading": location.course >= 0 ? location.course : nil,
+            "timestamp": ISO8601DateFormatter().string(from: location.timestamp)
+        ]
+
+        channel?.invokeMethod("location#onChanged", arguments: locationData)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let nsError = error as NSError
+        let errorCode: String
+        if nsError.code == 1 { // kCLErrorDenied
+            errorCode = "permissionDenied"
+        } else {
+            errorCode = "unknown"
+        }
+
+        let locationError: [String: Any] = [
+            "code": errorCode,
+            "message": error.localizedDescription,
+            "details": nsError.domain
+        ]
+        channel?.invokeMethod("location#onError", arguments: locationError)
     }
 }

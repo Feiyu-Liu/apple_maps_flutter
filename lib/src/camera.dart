@@ -158,3 +158,215 @@ class CameraUpdate {
 
   dynamic _toJson() => _json;
 }
+
+/// A coordinate region on the map.
+///
+/// Represents a rectangular area defined by a center point and spans in
+/// latitude and longitude directions.
+class CameraRegion {
+  const CameraRegion({
+    required this.center,
+    required this.latitudeDelta,
+    required this.longitudeDelta,
+  });
+
+  /// The center point of the region.
+  final LatLng center;
+
+  /// The latitude span (in degrees) from the center to the region's edge.
+  final double latitudeDelta;
+
+  /// The longitude span (in degrees) from the center to the region's edge.
+  final double longitudeDelta;
+
+  dynamic _toJson() => {
+        'center': center._toJson(),
+        'latitudeDelta': latitudeDelta,
+        'longitudeDelta': longitudeDelta,
+      };
+
+  static CameraRegion fromMap(dynamic json) {
+    final region = json as Map;
+    return CameraRegion(
+      center: LatLng._fromJson(region['center'])!,
+      latitudeDelta: region['latitudeDelta'] as double,
+      longitudeDelta: region['longitudeDelta'] as double,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (runtimeType != other.runtimeType) return false;
+    final CameraRegion typedOther = other as CameraRegion;
+    return center == typedOther.center &&
+        latitudeDelta == typedOther.latitudeDelta &&
+        longitudeDelta == typedOther.longitudeDelta;
+  }
+
+  @override
+  int get hashCode => Object.hash(center, latitudeDelta, longitudeDelta);
+
+  @override
+  String toString() =>
+      'CameraRegion(center: $center, latitudeDelta: $latitudeDelta, longitudeDelta: $longitudeDelta)';
+}
+
+/// A boundary that limits the area the user can pan to (iOS 13+).
+///
+/// When set, the user cannot pan the map outside the specified region.
+/// This is ignored on iOS versions prior to 13.0.
+class CameraBoundary {
+  /// Creates a camera boundary from a geographical bounding box.
+  ///
+  /// The [bounds] define the southwest and northeast corners of the allowable area.
+  const CameraBoundary.fromBounds(LatLngBounds bounds)
+      : _type = 'bounds',
+        _bounds = bounds,
+        _regionCenter = null,
+        _regionLatitudeDelta = null,
+        _regionLongitudeDelta = null;
+
+  /// Creates a camera boundary from a coordinate region.
+  ///
+  /// The [center] and deltas define the allowable area.
+  const CameraBoundary.fromRegion({
+    required LatLng center,
+    required double latitudeDelta,
+    required double longitudeDelta,
+  })  : _type = 'region',
+        _bounds = null,
+        _regionCenter = center,
+        _regionLatitudeDelta = latitudeDelta,
+        _regionLongitudeDelta = longitudeDelta;
+
+  /// An unbounded camera (no restrictions).
+  static const CameraBoundary unbounded = CameraBoundary._unbounded();
+
+  const CameraBoundary._unbounded()
+      : _type = 'unbounded',
+        _bounds = null,
+        _regionCenter = null,
+        _regionLatitudeDelta = null,
+        _regionLongitudeDelta = null;
+
+  final String _type;
+  final LatLngBounds? _bounds;
+  final LatLng? _regionCenter;
+  final double? _regionLatitudeDelta;
+  final double? _regionLongitudeDelta;
+
+  /// Returns the CameraRegion if this boundary was created with fromRegion
+  CameraRegion? get region {
+    if (_type != 'region') return null;
+    if (_regionCenter == null) return null;
+    return CameraRegion(
+      center: _regionCenter!,
+      latitudeDelta: _regionLatitudeDelta!,
+      longitudeDelta: _regionLongitudeDelta!,
+    );
+  }
+
+  dynamic _toJson() {
+    if (_type == 'unbounded') return null;
+    if (_type == 'bounds') return ['bounds', _bounds!._toJson()];
+    return ['region', region!._toJson()];
+  }
+
+  @visibleForTesting
+  static CameraBoundary? fromMap(dynamic json) {
+    if (json == null) return CameraBoundary.unbounded;
+    final type = json[0] as String;
+    if (type == 'bounds') {
+      return CameraBoundary.fromBounds(LatLngBounds.fromList(json[1])!);
+    }
+    final region = json[1] as Map;
+    return CameraBoundary.fromRegion(
+      center: LatLng._fromJson(region['center'])!,
+      latitudeDelta: region['latitudeDelta'] as double,
+      longitudeDelta: region['longitudeDelta'] as double,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (runtimeType != other.runtimeType) return false;
+    final CameraBoundary typedOther = other as CameraBoundary;
+    return _type == typedOther._type &&
+        _bounds == typedOther._bounds &&
+        _regionCenter == typedOther._regionCenter &&
+        _regionLatitudeDelta == typedOther._regionLatitudeDelta &&
+        _regionLongitudeDelta == typedOther._regionLongitudeDelta;
+  }
+
+  @override
+  int get hashCode => Object.hash(_type, _bounds, _regionCenter, _regionLatitudeDelta, _regionLongitudeDelta);
+
+  @override
+  String toString() {
+    if (_type == 'unbounded') return 'CameraBoundary.unbounded';
+    if (_type == 'bounds') return 'CameraBoundary.fromBounds($_bounds)';
+    return 'CameraBoundary.fromRegion($region)';
+  }
+}
+
+/// Defines the zoom range limits for the map camera (iOS 13+).
+///
+/// This restricts how close or far the user can zoom.
+/// This is ignored on iOS versions prior to 13.0.
+class CameraZoomRange {
+  /// Creates a zoom range with both minimum and maximum zoom levels.
+  ///
+  /// [minCenterCoordinateDistance]: The minimum distance from the camera
+  /// to the map center (in meters). Smaller values = more zoomed in.
+  ///
+  /// [maxCenterCoordinateDistance]: The maximum distance from the camera
+  /// to the map center (in meters). Larger values = more zoomed out.
+  const CameraZoomRange({
+    required double minCenterCoordinateDistance,
+    required double maxCenterCoordinateDistance,
+  })  : assert(minCenterCoordinateDistance <= maxCenterCoordinateDistance),
+        _minDistance = minCenterCoordinateDistance,
+        _maxDistance = maxCenterCoordinateDistance;
+
+  /// An unbounded zoom range (no restrictions).
+  static const CameraZoomRange unbounded = CameraZoomRange._unbounded();
+
+  const CameraZoomRange._unbounded()
+      : _minDistance = null,
+        _maxDistance = null;
+
+  final double? _minDistance;
+  final double? _maxDistance;
+
+  dynamic _toJson() {
+    if (_minDistance == null && _maxDistance == null) return null;
+    return [_minDistance, _maxDistance];
+  }
+
+  @visibleForTesting
+  static CameraZoomRange fromMap(dynamic json) {
+    if (json == null) return CameraZoomRange.unbounded;
+    return CameraZoomRange(
+      minCenterCoordinateDistance: json[0] as double,
+      maxCenterCoordinateDistance: json[1] as double,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (runtimeType != other.runtimeType) return false;
+    final CameraZoomRange typedOther = other as CameraZoomRange;
+    return _minDistance == typedOther._minDistance &&
+        _maxDistance == typedOther._maxDistance;
+  }
+
+  @override
+  int get hashCode => Object.hash(_minDistance, _maxDistance);
+
+  @override
+  String toString() =>
+      'CameraZoomRange(minDistance: $_minDistance, maxDistance: $_maxDistance)';
+}

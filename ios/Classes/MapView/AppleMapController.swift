@@ -130,6 +130,14 @@ public class AppleMapController: NSObject, FlutterPlatformView {
           self.updateSelectableFeatures(args: args)
           result(nil)
           break
+        case "camera#setBoundary":
+          self.setCameraBoundary(args: args)
+          result(nil)
+          break
+        case "camera#setZoomRange":
+          self.setCameraZoomRange(args: args)
+          result(nil)
+          break
         default:
           result(FlutterMethodNotImplemented)
           break
@@ -354,6 +362,31 @@ extension AppleMapController: MKMapViewDelegate {
   public func mapView(_ mapView: MKMapView, didDeselect annotation: MKAnnotation) {
     // 可以在这里处理取消选择的逻辑
     // 例如发送取消选择事件到Dart端
+  }
+
+  // MARK: - User Tracking Mode Changes
+
+  public func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
+    channel.invokeMethod("location#onTrackingModeChanged", arguments: [
+      "mode": mode.rawValue,
+      "animated": animated
+    ])
+  }
+
+  public func mapViewWillStartLocatingUser(_ mapView: MKMapView) {
+    // 可选: 通知 Dart 开始定位
+  }
+
+  public func mapViewDidStopLocatingUser(_ mapView: MKMapView) {
+    // 可选: 通知 Dart 停止定位
+  }
+
+  public func mapView(_ mapView: MKMapView, didFailToLocateUserWithError error: Error) {
+    channel.invokeMethod("location#onError", arguments: [
+      "code": "unknown",
+      "message": error.localizedDescription,
+      "details": nil
+    ])
   }
 
   // 处理POI选择事件
@@ -684,6 +717,83 @@ extension AppleMapController {
       if let featuresOptions = args["features"] as? [String: Any] {
         mapView.selectableMapFeatures = POIHandler.parseMapFeatureOptions(featuresOptions)
       }
+    }
+  }
+
+  // MARK: - Camera Constraints Methods (iOS 13+)
+
+  /// 设置相机平移边界
+  private func setCameraBoundary(args: [String: Any]) {
+    guard let boundaryData = args["boundary"] as? [Any] else {
+      if #available(iOS 13.0, *) {
+        // Clear the boundary by setting an empty one
+        mapView.setCameraBoundary(MKMapView.CameraBoundary(), animated: false)
+      }
+      return
+    }
+    guard let animated = args["animated"] as? Bool else { return }
+
+    if #available(iOS 13.0, *) {
+      let boundaryType = boundaryData[0] as! String
+
+      if boundaryType == "bounds" {
+        let boundsData = boundaryData[1] as! [[Double]]
+        let NE = CLLocationCoordinate2D(
+          latitude: boundsData[1][0],
+          longitude: boundsData[1][1]
+        )
+        let SW = CLLocationCoordinate2D(
+          latitude: boundsData[0][0],
+          longitude: boundsData[0][1]
+        )
+        let mapRect = MKMapRect(
+          origin: MKMapPoint(SW),
+          size: MKMapSize(
+            width: MKMapPoint(NE).x - MKMapPoint(SW).x,
+            height: MKMapPoint(NE).y - MKMapPoint(SW).y
+          )
+        )
+        // Note: mapRect initializer may return optional in some iOS versions
+        if let boundary = MKMapView.CameraBoundary(mapRect: mapRect) {
+          mapView.setCameraBoundary(boundary, animated: animated)
+        }
+      } else {
+        // region type - note: coordinateRegion initializer returns optional
+        let regionData = boundaryData[1] as! [String: Any]
+        let center = CLLocationCoordinate2D(
+          latitude: (regionData["center"] as! [Double])[0],
+          longitude: (regionData["center"] as! [Double])[1]
+        )
+        let span = MKCoordinateSpan(
+          latitudeDelta: regionData["latitudeDelta"] as! Double,
+          longitudeDelta: regionData["longitudeDelta"] as! Double
+        )
+        let coordinateRegion = MKCoordinateRegion(center: center, span: span)
+        if let boundary = MKMapView.CameraBoundary(coordinateRegion: coordinateRegion) {
+          mapView.setCameraBoundary(boundary, animated: animated)
+        }
+      }
+    }
+  }
+
+  /// 设置相机缩放范围
+  private func setCameraZoomRange(args: [String: Any]) {
+    guard let zoomRangeData = args["zoomRange"] as? [Any] else {
+      if #available(iOS 13.0, *) {
+        mapView.cameraZoomRange = nil
+      }
+      return
+    }
+    guard let animated = args["animated"] as? Bool else { return }
+
+    if #available(iOS 13.0, *) {
+      let minDistance = zoomRangeData[0] as! Double
+      let maxDistance = zoomRangeData[1] as! Double
+      let zoomRange = MKMapView.CameraZoomRange(
+        minCenterCoordinateDistance: minDistance,
+        maxCenterCoordinateDistance: maxDistance
+      )
+      mapView.setCameraZoomRange(zoomRange, animated: animated)
     }
   }
 

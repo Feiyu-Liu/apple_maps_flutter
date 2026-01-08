@@ -93,3 +93,6 @@ class MinMaxZoomPreference {
     return 'MinMaxZoomPreference(minZoom: $minZoom, maxZoom: $maxZoom)';
   }
 }
+
+/// Callback type for user tracking mode changes.
+typedef UserTrackingModeCallback = void Function(TrackingMode mode, bool animated);

@@ -80,6 +80,15 @@ class AppleMapController {
       case 'poi#onSelected':
         _appleMapState.onPOISelected(call.arguments);
         break;
+      case 'location#onChanged':
+        _appleMapState.onLocationChanged(call.arguments);
+        break;
+      case 'location#onError':
+        _appleMapState.onLocationError(call.arguments);
+        break;
+      case 'location#onTrackingModeChanged':
+        _appleMapState.onUserTrackingModeChanged(call.arguments);
+        break;
       default:
         throw MissingPluginException();
     }
@@ -444,5 +453,69 @@ class AppleMapController {
         'features': features.toMap(),
       },
     );
+  }
+
+  // MARK: - Camera Constraints Methods (iOS 13+)
+
+  /// Sets the camera boundary that limits panning (iOS 13+).
+  ///
+  /// [boundary] The boundary to apply, or [CameraBoundary.unbounded] to remove.
+  /// [animated] Whether to animate the transition to the boundary.
+  ///
+  /// This method has no effect on iOS versions prior to 13.0.
+  ///
+  /// Example:
+  /// ```dart
+  /// // Restrict to San Francisco Bay Area
+  /// await controller.setCameraBoundary(
+  ///   CameraBoundary.fromBounds(
+  ///     LatLngBounds(
+  ///       southwest: LatLng(37.4, -122.5),
+  ///       northeast: LatLng(37.8, -122.0),
+  ///     ),
+  ///   ),
+  /// );
+  ///
+  /// // Remove restriction
+  /// await controller.setCameraBoundary(CameraBoundary.unbounded);
+  /// ```
+  Future<void> setCameraBoundary(
+    CameraBoundary boundary, {
+    bool animated = true,
+  }) async {
+    await channel.invokeMethod<void>('camera#setBoundary', <String, dynamic>{
+      'boundary': boundary._toJson(),
+      'animated': animated,
+    });
+  }
+
+  /// Sets the camera zoom range that limits zooming (iOS 13+).
+  ///
+  /// [zoomRange] The zoom range to apply, or [CameraZoomRange.unbounded] to remove.
+  /// [animated] Whether to animate the transition to the range.
+  ///
+  /// This method has no effect on iOS versions prior to 13.0.
+  ///
+  /// Example:
+  /// ```dart
+  /// // Limit zoom from city level (1km) to region level (50km)
+  /// await controller.setCameraZoomRange(
+  ///   CameraZoomRange(
+  ///     minCenterCoordinateDistance: 1000,
+  ///     maxCenterCoordinateDistance: 50000,
+  ///   ),
+  /// );
+  ///
+  /// // Remove restriction
+  /// await controller.setCameraZoomRange(CameraZoomRange.unbounded);
+  /// ```
+  Future<void> setCameraZoomRange(
+    CameraZoomRange zoomRange, {
+    bool animated = true,
+  }) async {
+    await channel.invokeMethod<void>('camera#setZoomRange', <String, dynamic>{
+      'zoomRange': zoomRange._toJson(),
+      'animated': animated,
+    });
   }
 }

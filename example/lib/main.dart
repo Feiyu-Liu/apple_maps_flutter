@@ -4,6 +4,7 @@
 
 import 'package:apple_maps_flutter_example/animate_camera.dart';
 import 'package:apple_maps_flutter_example/annotation_icons.dart';
+import 'package:apple_maps_flutter_example/camera_location_example.dart';
 import 'package:apple_maps_flutter_example/map_click.dart';
 import 'package:apple_maps_flutter_example/map_coordinates.dart';
 import 'package:apple_maps_flutter_example/map_ui.dart';
@@ -38,6 +39,7 @@ final List<ExamplePage> _allPages = <ExamplePage>[
   SnapshotPage(),
   RouteCalculationPage(), // 🆕 路线计算示例
   POIFeaturesPage(), // 🆕 POI功能示例 (iOS 16+)
+  CameraLocationPage(), // 🆕 相机约束与位置跟踪示例 (iOS 13+)
 ];
 
 class MapsDemo extends StatelessWidget {

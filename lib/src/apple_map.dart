@@ -47,6 +47,13 @@ class AppleMap extends StatefulWidget {
     this.mapConfigurationOptions,
     this.selectableMapFeatures,
     this.onPOISelected,
+    // Camera constraints (iOS 13+)
+    this.cameraBoundary,
+    this.cameraZoomRange,
+    // Location tracking callbacks
+    this.onLocationChanged,
+    this.onLocationError,
+    this.onUserTrackingModeChanged,
   }) : super(key: key);
 
   final MapCreatedCallback? onMapCreated;
@@ -182,6 +189,42 @@ class AppleMap extends StatefulWidget {
 
   // iOS 16+ POI selection callback
   final ArgumentCallback<POIData>? onPOISelected;
+
+  // Camera constraints (iOS 13+)
+  /// The boundary that limits the area the user can pan to (iOS 13+).
+  ///
+  /// When set, the user cannot pan the map outside the specified region.
+  /// Use [CameraBoundary.unbounded] to remove restrictions.
+  ///
+  /// This is ignored on iOS versions prior to 13.0.
+  final CameraBoundary? cameraBoundary;
+
+  /// The zoom range that limits how close/far the user can zoom (iOS 13+).
+  ///
+  /// When set, the user cannot zoom outside the specified range.
+  /// Use [CameraZoomRange.unbounded] to remove restrictions.
+  ///
+  /// This is ignored on iOS versions prior to 13.0.
+  final CameraZoomRange? cameraZoomRange;
+
+  // Location tracking callbacks
+  /// Called when the user's location is updated.
+  ///
+  /// This callback provides detailed location information including
+  /// coordinates, accuracy, speed, heading, and timestamp.
+  ///
+  /// Only triggers when [myLocationEnabled] is true.
+  final ArgumentCallback<LocationData>? onLocationChanged;
+
+  /// Called when location tracking encounters an error.
+  ///
+  /// This can happen due to permission denial, service disabled, etc.
+  final ArgumentCallback<LocationError>? onLocationError;
+
+  /// Called when the user tracking mode changes.
+  ///
+  /// Provides the new [TrackingMode] and whether the change was animated.
+  final UserTrackingModeCallback? onUserTrackingModeChanged;
 
   @override
   State createState() => _AppleMapState();
@@ -338,6 +381,20 @@ class _AppleMapState extends State<AppleMap> {
   void onPOISelected(Map<dynamic, dynamic> poiData) {
     widget.onPOISelected?.call(POIData.fromMap(poiData));
   }
+
+  void onLocationChanged(Map<dynamic, dynamic> locationJson) {
+    widget.onLocationChanged?.call(LocationData.fromMap(locationJson));
+  }
+
+  void onLocationError(Map<dynamic, dynamic> errorJson) {
+    widget.onLocationError?.call(LocationError.fromMap(errorJson));
+  }
+
+  void onUserTrackingModeChanged(Map<dynamic, dynamic> data) {
+    final mode = TrackingMode.values[data['mode'] as int];
+    final animated = data['animated'] as bool;
+    widget.onUserTrackingModeChanged?.call(mode, animated);
+  }
 }
 
 /// Configuration options for the AppleMaps user interface.
@@ -361,6 +418,8 @@ class _AppleMapOptions {
     this.insetsLayoutMarginsFromSafeArea,
     this.mapConfigurationOptions,
     this.selectableMapFeatures,
+    this.cameraBoundary,
+    this.cameraZoomRange,
   });
 
   static _AppleMapOptions fromWidget(AppleMap map) {
@@ -380,6 +439,8 @@ class _AppleMapOptions {
       insetsLayoutMarginsFromSafeArea: map.insetsLayoutMarginsFromSafeArea,
       mapConfigurationOptions: map.mapConfigurationOptions,
       selectableMapFeatures: map.selectableMapFeatures,
+      cameraBoundary: map.cameraBoundary,
+      cameraZoomRange: map.cameraZoomRange,
     );
   }
 
@@ -412,6 +473,10 @@ class _AppleMapOptions {
   final MapConfigurationOptions? mapConfigurationOptions;
 
   final MapFeatureOptions? selectableMapFeatures;
+
+  final CameraBoundary? cameraBoundary;
+
+  final CameraZoomRange? cameraZoomRange;
 
   Map<String, dynamic> toMap() {
     final Map<String, dynamic> optionsMap = <String, dynamic>{};
@@ -449,6 +514,10 @@ class _AppleMapOptions {
     if (selectableMapFeatures != null) {
       optionsMap['selectableFeatures'] = selectableMapFeatures!.toMap();
     }
+
+    // Camera constraints (iOS 13+)
+    addIfNonNull('cameraBoundary', cameraBoundary?._toJson());
+    addIfNonNull('cameraZoomRange', cameraZoomRange?._toJson());
 
     return optionsMap;
   }

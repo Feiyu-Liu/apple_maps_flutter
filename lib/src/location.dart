@@ -118,3 +118,175 @@ class LatLngBounds {
   @override
   int get hashCode => Object.hash(southwest, northeast);
 }
+
+/// Error codes for location-related failures.
+enum LocationErrorCode {
+  /// Permission denied by user.
+  permissionDenied,
+
+  /// Location services are disabled.
+  serviceDisabled,
+
+  /// Location request timed out.
+  timeout,
+
+  /// Network-related error.
+  network,
+
+  /// Unknown error.
+  unknown,
+}
+
+/// Extension for LocationErrorCode enum.
+extension LocationErrorCodeExtension on LocationErrorCode {
+  /// Converts the enum to a string value.
+  String toValue() => name;
+
+  /// Creates a LocationErrorCode from a string value.
+  static LocationErrorCode fromValue(String value) {
+    return LocationErrorCode.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => LocationErrorCode.unknown,
+    );
+  }
+}
+
+/// Represents an error that occurred during location tracking.
+class LocationError {
+  const LocationError({
+    required this.code,
+    required this.message,
+    this.details,
+  });
+
+  /// The error code.
+  final LocationErrorCode code;
+
+  /// Human-readable error message.
+  final String message;
+
+  /// Additional error details, if available.
+  final dynamic details;
+
+  static LocationError fromMap(dynamic json) {
+    return LocationError(
+      code: LocationErrorCodeExtension.fromValue(json['code'] as String),
+      message: json['message'] as String,
+      details: json['details'],
+    );
+  }
+
+  @override
+  String toString() => 'LocationError($code: $message)';
+}
+
+/// Represents a geographical location with metadata.
+///
+/// Contains coordinates, accuracy, speed, heading, and timestamp information
+/// from the device's location services.
+class LocationData {
+  const LocationData({
+    required this.latitude,
+    required this.longitude,
+    this.accuracy,
+    this.altitude,
+    this.speed,
+    this.speedAccuracy,
+    this.heading,
+    this.timestamp,
+  });
+
+  /// The latitude in degrees.
+  final double latitude;
+
+  /// The longitude in degrees.
+  final double longitude;
+
+  /// The estimated horizontal accuracy of the location, in meters.
+  ///
+  /// A negative value indicates no accuracy data is available.
+  final double? accuracy;
+
+  /// The altitude in meters above sea level.
+  ///
+  /// Null if altitude is not available.
+  final double? altitude;
+
+  /// The speed in meters/second.
+  ///
+  /// Null if speed is not available.
+  final double? speed;
+
+  /// The estimated speed accuracy in meters/second.
+  ///
+  /// Null if speed accuracy is not available.
+  final double? speedAccuracy;
+
+  /// The heading in degrees relative to true north.
+  ///
+  /// Values are in the range [0, 360). Null if heading is not available.
+  final double? heading;
+
+  /// The timestamp of the location fix.
+  final DateTime? timestamp;
+
+  /// Converts to LatLng for easy map positioning.
+  LatLng toLatLng() => LatLng(latitude, longitude);
+
+  dynamic _toJson() => {
+        'latitude': latitude,
+        'longitude': longitude,
+        if (accuracy != null) 'accuracy': accuracy,
+        if (altitude != null) 'altitude': altitude,
+        if (speed != null) 'speed': speed,
+        if (speedAccuracy != null) 'speedAccuracy': speedAccuracy,
+        if (heading != null) 'heading': heading,
+        if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
+      };
+
+  static LocationData fromMap(dynamic json) {
+    return LocationData(
+      latitude: json['latitude'] as double,
+      longitude: json['longitude'] as double,
+      accuracy: json['accuracy'] as double?,
+      altitude: json['altitude'] as double?,
+      speed: json['speed'] as double?,
+      speedAccuracy: json['speedAccuracy'] as double?,
+      heading: json['heading'] as double?,
+      timestamp: json['timestamp'] != null
+          ? DateTime.parse(json['timestamp'] as String)
+          : null,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (runtimeType != other.runtimeType) return false;
+    final LocationData typedOther = other as LocationData;
+    return latitude == typedOther.latitude &&
+        longitude == typedOther.longitude &&
+        accuracy == typedOther.accuracy &&
+        altitude == typedOther.altitude &&
+        speed == typedOther.speed &&
+        speedAccuracy == typedOther.speedAccuracy &&
+        heading == typedOther.heading &&
+        timestamp == typedOther.timestamp;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    latitude,
+    longitude,
+    accuracy,
+    altitude,
+    speed,
+    speedAccuracy,
+    heading,
+    timestamp,
+  );
+
+  @override
+  String toString() =>
+      'LocationData(lat: $latitude, lng: $longitude, accuracy: $accuracy)';
+}

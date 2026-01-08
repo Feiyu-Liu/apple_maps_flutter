@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.6.0
+
+* **NEW: Camera Constraints and Advanced Control (iOS 13+)**
+  * Added `CameraBoundary` class to limit map panning area
+  * Added `CameraZoomRange` class to restrict zoom levels
+  * Added `CameraRegion` class for coordinate region representation
+  * Added `AppleMapController.setCameraBoundary()` method
+  * Added `AppleMapController.setCameraZoomRange()` method
+  * Supports both LatLngBounds and CoordinateRegion boundary creation
+* **NEW: User Location Tracking (Complete Implementation)**
+  * Added `LocationData` model with comprehensive location information (coordinates, accuracy, altitude, speed, heading, timestamp)
+  * Added `LocationError` class and `LocationErrorCode` enum for error handling
+  * Added `onLocationChanged` callback to receive real-time location updates
+  * Added `onLocationError` callback for location failure handling
+  * Added `onUserTrackingModeChanged` callback for tracking mode changes
+  * Implemented CLLocationManagerDelegate on native iOS side
+* Added camera and location tracking example demonstrating all new features
+* Maintains backward compatibility (camera constraints ignored on iOS < 13, location tracking works on all iOS versions)
+
+## 1.5.0
+
+* **NEW: POI (Point of Interest) and Map Features Support (iOS 16+)**
+  * Added `MapConfigurationOptions` to use iOS 16+ MKMapConfiguration API
+  * Added `MapFeatureOptions` for controlling selectable map features
+  * Added `POIData` model with comprehensive POI information
+  * Added `POICategory` enum with 90+ POI types
+  * Added `onPOISelected` callback to handle POI selection events
+  * Added `AppleMapController.updateMapConfiguration()` method
+  * Added `AppleMapController.updateSelectableFeatures()` method
+  * Replaced deprecated `mapType` with new iOS 16+ configuration system
+  * Maintains backward compatibility with iOS 14-15 (falls back to deprecated `mapType`)
+* Added POI example demonstrating all new features
+
 ## 1.4.0
 
 * Flutter 3.27.1 compatibility, replace `ui.hash*` with `Object.hash*
